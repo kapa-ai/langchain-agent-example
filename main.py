@@ -20,7 +20,7 @@ load_dotenv()
 
 async def main():
     """Run the interactive chat interface."""
-    from src.agent import create_agent, run_agent
+    from src.agent import create_in_product_agent, run_agent
     
     product_name = os.getenv("PRODUCT_NAME", "<Your Product>")
     
@@ -34,7 +34,7 @@ async def main():
     print()
     
     try:
-        agent = await create_agent()
+        agent = await create_in_product_agent()
     except ValueError as e:
         print(f"Error: {e}")
         print()
@@ -77,11 +77,11 @@ async def main():
             break
         
         print()
+        print("Assistant: ", end="", flush=True)
         
         # Run without conversation history (stateless)
-        response, _ = await run_agent(agent, user_input)
-        
-        print(f"Assistant: {response}")
+        # Response is streamed directly to stdout
+        await run_agent(agent, user_input)
 
 
 if __name__ == "__main__":

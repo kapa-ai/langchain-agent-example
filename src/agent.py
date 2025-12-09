@@ -1,7 +1,7 @@
 """
 In-Product Agent with Kapa MCP Server Integration
 
-This module implements a LangGraph-based agent that can:
+This module implements a LangChain agent using create_agent that can:
 1. Answer questions about the user's subscription
 2. Provide information about team members
 3. Answer product questions using Kapa's MCP server
@@ -11,22 +11,11 @@ helping users with both operational tasks and product knowledge questions.
 """
 
 import os
-from typing import Annotated, TypedDict
 
-from langchain_core.messages import AnyMessage, SystemMessage
-from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode, tools_condition
+from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from src.tools import get_subscription_info, get_team_members
-
-
-# Agent state definition
-class AgentState(TypedDict):
-    """State for the in-product agent."""
-    messages: Annotated[list[AnyMessage], add_messages]
 
 
 # System prompt template for the agent
@@ -60,11 +49,11 @@ You're an assistant within the product - users expect you to know about their ac
 be knowledgeable about {product_name} itself."""
 
 
-async def create_agent(
+async def create_in_product_agent(
     mcp_server_url: str | None = None,
     mcp_api_key: str | None = None,
     product_name: str | None = None,
-    model_name: str = "gpt-4o-mini",
+    model_name: str = "gpt-5.1",
 ):
     """
     Create the in-product agent with all tools configured.
@@ -76,7 +65,7 @@ async def create_agent(
         model_name: OpenAI model to use for the agent
     
     Returns:
-        A compiled LangGraph agent ready to handle user queries.
+        A LangChain agent ready to handle user queries.
     """
     # Get configuration from environment if not provided
     mcp_server_url = mcp_server_url or os.getenv("KAPA_MCP_SERVER_URL")
@@ -94,9 +83,6 @@ async def create_agent(
             "KAPA_API_KEY must be set either as argument or environment variable. "
             "This is your Kapa API key for the MCP server."
         )
-    
-    # Initialize the LLM
-    llm = ChatOpenAI(model=model_name, temperature=0)
     
     # Collect all tools
     # Start with our custom internal tools
@@ -125,65 +111,67 @@ async def create_agent(
         print(f"  → {tool.name}")
     print()
     
-    # Bind tools to the LLM
-    llm_with_tools = llm.bind_tools(tools)
-    
     # Build the system prompt with the product name
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(product_name=product_name)
     
-    # Define the agent node
-    def agent_node(state: AgentState) -> AgentState:
-        """Process messages and decide whether to use tools or respond."""
-        messages = state["messages"]
-        
-        # Add system prompt if this is the first message
-        if not any(isinstance(m, SystemMessage) for m in messages):
-            messages = [SystemMessage(content=system_prompt)] + messages
-        
-        response = llm_with_tools.invoke(messages)
-        return {"messages": [response]}
-    
-    # Build the graph
-    graph_builder = StateGraph(AgentState)
-    
-    # Add nodes
-    graph_builder.add_node("agent", agent_node)
-    graph_builder.add_node("tools", ToolNode(tools))
-    
-    # Add edges
-    graph_builder.add_edge(START, "agent")
-    graph_builder.add_conditional_edges(
-        "agent",
-        tools_condition,  # Routes to "tools" if tool calls present, else END
+    # Create the agent using LangChain's create_agent
+    # This handles the ReAct loop automatically
+    agent = create_agent(
+        model=model_name,
+        tools=tools,
+        system_prompt=system_prompt,
     )
-    graph_builder.add_edge("tools", "agent")  # After tools, go back to agent
     
-    # Compile and return
-    return graph_builder.compile()
+    return agent
 
 
-async def run_agent(agent, user_message: str, conversation_history: list | None = None):
+async def run_agent(agent, user_message: str, verbose: bool = True):
     """
-    Run the agent with a user message.
+    Run the agent with a user message, streaming output to show reasoning.
     
     Args:
-        agent: The compiled LangGraph agent
+        agent: The LangChain agent
         user_message: The user's input message
-        conversation_history: Optional list of previous messages for context
+        verbose: Whether to print tool calls and reasoning (default: True)
     
     Returns:
         The agent's response as a string
     """
-    from langchain_core.messages import HumanMessage
+    final_response = ""
     
-    # Build the messages list
-    messages = conversation_history or []
-    messages.append(HumanMessage(content=user_message))
+    # Stream the agent execution to show what's happening
+    async for event in agent.astream_events(
+        {"messages": [{"role": "user", "content": user_message}]},
+        version="v2"
+    ):
+        kind = event["event"]
+        
+        # Show when the LLM starts generating
+        if kind == "on_chat_model_stream":
+            # Stream tokens as they come in
+            chunk = event["data"]["chunk"]
+            if chunk.content:
+                print(chunk.content, end="", flush=True)
+                final_response += chunk.content
+        
+        # Show tool calls
+        elif kind == "on_tool_start" and verbose:
+            tool_name = event["name"]
+            tool_input = event["data"].get("input", {})
+            print(f"\n\n🔧 Calling tool: {tool_name}")
+            if isinstance(tool_input, dict) and tool_input:
+                for key, value in tool_input.items():
+                    # Truncate long values
+                    display_value = str(value)[:100] + "..." if len(str(value)) > 100 else value
+                    print(f"   {key}: {display_value}")
+            print()
+        
+        # Show when tool completes
+        elif kind == "on_tool_end" and verbose:
+            print(f"✓ Tool completed\n")
     
-    # Run the agent
-    result = await agent.ainvoke({"messages": messages})
+    # Ensure we end with a newline
+    if final_response and not final_response.endswith("\n"):
+        print()
     
-    # Extract the final response
-    final_message = result["messages"][-1]
-    return final_message.content, result["messages"]
-
+    return final_response
