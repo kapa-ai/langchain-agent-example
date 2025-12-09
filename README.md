@@ -44,8 +44,6 @@ Here’s how the pieces fit together inside your product:
                                    └─────────────────────────┘
 ```
 
-This example uses LangChain's `create_agent` for orchestration, but you could use any framework or just raw Python with the OpenAI SDK.
-
 ## Prerequisites
 
 - Docker and Docker Compose
@@ -264,56 +262,7 @@ def get_subscription_info(user_id: str = None) -> str:
     return "Mock subscription data"
 ```
 
-## Customizing for Your Product
-
-### Replace Mock Data
-
-The example uses mock data for subscription and team information. In production, you would replace these with actual API calls:
-
-1. `src/tools/subscription.py`: Connect to your billing system (Stripe, etc.)
-2. `src/tools/team.py`: Connect to your user management database
-
-### Add More Tools
-
-You can add any tools your in-product agent needs to interact with your product's functionality (e.g., creating resources, running reports, modifying settings).
-
-```python
-@tool
-def create_project(name: str, template: str = "default") -> str:
-    """Create a new project for the user."""
-    # Your implementation
-    pass
-
-@tool  
-def get_recent_activity(days: int = 7) -> str:
-    """Get the user's recent activity in the product."""
-    # Your implementation
-    pass
-```
-
-### Customize the System Prompt
-
-Edit `SYSTEM_PROMPT_TEMPLATE` in `src/agent.py` to match your product's personality, capabilities, and specific guidance for tool usage.
-
-## Best Practices
-
-1. **Keep API keys server-side**: Never expose your Kapa API key in client-side code.
-2. **Add authentication context**: In production, pass user context (e.g., `user_id`) to tools for proper authorization and personalized responses.
-3. **Rate limiting**: Kapa enforces 60 requests/minute per API key by default. Plan for higher traffic by contacting Kapa support.
-4. **Error handling**: The MCP tools handle errors gracefully, but consider adding retry logic and more robust error reporting for production.
-
 ## Learn More
 
 - [Kapa Hosted MCP Server Documentation](https://docs.kapa.ai/integrations/mcp)
 - [LangChain Agents Documentation](https://docs.langchain.com/oss/python/langchain/agents)
-- [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
-
-## Support
-
-For questions about:
-- **This example**: Open an issue on this repository
-- **Kapa Hosted MCP Server**: Contact support@kapa.ai
-- **LangChain/LangGraph**: Visit the [LangChain Discord](https://discord.gg/langchain)
-
-
