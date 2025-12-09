@@ -13,9 +13,17 @@ helping users with both operational tasks and product knowledge questions.
 import os
 
 from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from src.tools import get_subscription_info, get_team_members
+
+
+# ANSI escape codes for terminal styling
+class Style:
+    ITALIC = "\033[3m"
+    DIM = "\033[2m"
+    RESET = "\033[0m"
 
 
 # System prompt template for the agent
@@ -114,10 +122,20 @@ async def create_in_product_agent(
     # Build the system prompt with the product name
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(product_name=product_name)
     
+    # Configure the model with reasoning enabled
+    # This allows us to see the model's thinking process
+    model = ChatOpenAI(
+        model=model_name,
+        reasoning={
+            "effort": "medium",  # 'low', 'medium', or 'high'
+            "summary": "detailed",  # Show detailed reasoning summary
+        },
+    )
+    
     # Create the agent using LangChain's create_agent
     # This handles the ReAct loop automatically
     agent = create_agent(
-        model=model_name,
+        model=model,
         tools=tools,
         system_prompt=system_prompt,
     )
@@ -138,6 +156,7 @@ async def run_agent(agent, user_message: str, verbose: bool = True):
         The agent's response as a string
     """
     final_response = ""
+    in_reasoning = False
     
     # Stream the agent execution to show what's happening
     async for event in agent.astream_events(
@@ -148,17 +167,43 @@ async def run_agent(agent, user_message: str, verbose: bool = True):
         
         # Show when the LLM starts generating
         if kind == "on_chat_model_stream":
-            # Stream tokens as they come in
             chunk = event["data"]["chunk"]
-            if chunk.content:
+            
+            # Check for reasoning blocks in content_blocks
+            if hasattr(chunk, "content_blocks") and chunk.content_blocks:
+                for block in chunk.content_blocks:
+                    if block.get("type") == "reasoning" and verbose:
+                        if not in_reasoning:
+                            print(f"\n🧠 {Style.DIM}{Style.ITALIC}", end="", flush=True)
+                            in_reasoning = True
+                        reasoning_text = block.get("reasoning", "")
+                        if reasoning_text:
+                            # Stream reasoning tokens inline in italic
+                            print(reasoning_text, end="", flush=True)
+                    elif block.get("type") == "text":
+                        text = block.get("text", "")
+                        if text:
+                            if in_reasoning:
+                                print(f"{Style.RESET}\n\n", flush=True)
+                                in_reasoning = False
+                            print(text, end="", flush=True)
+                            final_response += text
+            # Fallback to regular content streaming
+            elif chunk.content:
+                if in_reasoning:
+                    print(f"{Style.RESET}\n\n", flush=True)
+                    in_reasoning = False
                 print(chunk.content, end="", flush=True)
                 final_response += chunk.content
         
         # Show tool calls
         elif kind == "on_tool_start" and verbose:
+            if in_reasoning:
+                print(f"{Style.RESET}\n", flush=True)
+                in_reasoning = False
             tool_name = event["name"]
             tool_input = event["data"].get("input", {})
-            print(f"\n\n🔧 Calling tool: {tool_name}")
+            print(f"\n🔧 Calling tool: {tool_name}")
             if isinstance(tool_input, dict) and tool_input:
                 for key, value in tool_input.items():
                     # Truncate long values
