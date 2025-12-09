@@ -209,14 +209,13 @@ from langchain_openai import ChatOpenAI
 
 # ... (tools and system_prompt defined)
 
-llm = ChatOpenAI(
+model = ChatOpenAI(
     model="gpt-5.1",
     reasoning={"effort": "medium", "summary": "detailed"},
-    temperature=0
 )
 
 agent = create_agent(
-    model=llm,
+    model=model,
     tools=tools,
     system_prompt=system_prompt,
 )
