@@ -1,47 +1,54 @@
 # In-Product Agent Example
 
-This is a **reference implementation** showing how to build an AI agent that lives inside your product. The kind of assistant users can chat with directly in your app—asking about their account, getting help with features, or taking actions.
+This repo contains an example in-product agent whose purpose is to show you how to build your own assistant inside your app.
 
-The specific tools in this example (subscription info, team members) are just **placeholders**. In your own implementation, you'd replace these with tools that call your actual APIs and do whatever makes sense for your product. The pattern stays the same.
+The agent in this example can answer questions about subscription plans, team members, and your product docs — but these are all **dummy tools**. They only exist to demonstrate the pattern; in a real setup you’d replace them with tools that call your own APIs and data stores.
 
-## What This Example Shows
+What really matters is the approach:
 
-1. **Your own tools** – Custom tools that call your product's APIs (we show mock examples for subscription and team data)
-2. **Kapa MCP tool** – Answers product questions by searching your documentation via the hosted MCP server
-3. **A reasoning model** – GPT-5.1 decides which tool to use based on what the user asks
+- a **reasoning model** (GPT-5.1) that decides what to do,
+- **native tools** that talk to your product (e.g. billing, teams, settings),
+- a **Kapa retrieval tool via MCP** that searches your docs and guides.
+
+Together, this gives you an in-product agent that can use both your live product data and your documentation to help users without leaving your app.
+
+
+This example uses LangChain’s `create_agent` for orchestration and an OpenAI reasoning model, but you can swap this for any agent framework including none and any reasoning model that supports tools.
+
+## Architecture Overview
+
+Here’s how the pieces fit together inside your product:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Your SaaS Product                           │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                 AI Agent (GPT-5.1)                        │  │
+│  │                      AI Agent                             │  │
+│  │                   (GPT-5.1 + Tools)                       │  │
 │  │                                                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐  │  │
-│  │  │ Subscription│  │    Team     │  │   Kapa MCP Tool  │  │  │
-│  │  │    Tool     │  │   Tool      │  │ (Documentation)  │  │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └────────┬─────────┘  │  │
-│  │         │                │                   │            │  │
-│  └─────────┼────────────────┼───────────────────┼────────────┘  │
-│            │                │                   │               │
-│            ▼                ▼                   │               │
-│    ┌──────────────┐  ┌──────────────┐          │               │
-│    │  Billing DB  │  │   Users DB   │          │               │
-│    └──────────────┘  └──────────────┘          │               │
-└────────────────────────────────────────────────┼───────────────┘
+│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │  │
+│  │  │ Subscription│  │    Team     │  │   Kapa MCP Tool  │   │  │
+│  │  │    Tool     │  │   Tool      │  │ (Documentation)  │   │  │
+│  │  └──────┬──────┘  └──────┬──────┘  └────────┬─────────┘   │  │
+│  └─────────┼────────────────┼──────────────────┼─────────────┘  │
+│            │                │                  │                │
+│            ▼                ▼                  │                │
+│      Your APIs        Your Database            │                │
+└────────────────────────────────────────────────┼────────────────┘
                                                  │
                                                  ▼
-                                    ┌─────────────────────────┐
-                                    │  Kapa Hosted MCP Server │
-                                    │   (your-project.mcp.    │
-                                    │       kapa.ai)          │
-                                    └─────────────────────────┘
+                                   ┌─────────────────────────┐
+                                   │  Kapa Hosted MCP Server │
+                                   │   (your-project.mcp.    │
+                                   │       kapa.ai)          │
+                                   └─────────────────────────┘
 ```
 
 ## Prerequisites
 
 - Docker and Docker Compose
 - An OpenAI API key
-- A Kapa Hosted MCP Server with API key authentication
+- An active Kapa account with a project that has a Hosted MCP Server configured (if you don't have one yet, follow the instructions below)
 
 ## Setting Up Your Kapa MCP Server
 
@@ -79,7 +86,7 @@ KAPA_API_KEY=your-kapa-api-key
 PRODUCT_NAME=My Awesome Product
 ```
 
-3. Start the container:
+3. Start a shell in the container:
 
 ```bash
 docker compose run --rm agent
@@ -125,7 +132,7 @@ python main.py
 
 This starts an interactive chat session where you can ask questions.
 
-### Example Session
+## Example Session
 
 ```
 ============================================================
@@ -140,12 +147,20 @@ Loaded 1 tool(s) from Kapa MCP server:
 👋 Hi! I'm your My Awesome Product assistant. I can help you with:
 
   📊 Subscription & Billing
-  👥 Team Management
-  📚 Product Questions
+     Ask about your plan, seats, features, or renewal dates
 
+  👥 Team Management
+     See who's on your team, their roles, and departments
+
+  📚 Product Questions
+     How-to guides, features, troubleshooting, and best practices
+
+------------------------------------------------------------
+Type 'quit' to exit
 ------------------------------------------------------------
 
 You: What plan am I on?
+
 🧠 The user is asking about their subscription...
 
 🔧 Calling tool: get_subscription_info
@@ -175,40 +190,45 @@ langchain-agent-example/
 ├── requirements.txt        # Python dependencies
 └── src/
     ├── __init__.py
-    ├── agent.py           # Agent configuration (using create_agent)
+    ├── agent.py           # LangChain agent definition (using create_agent)
     └── tools/
         ├── __init__.py
-        ├── subscription.py # Subscription info tool
-        └── team.py        # Team members tool
+        ├── subscription.py # Mock subscription info tool
+        └── team.py        # Mock team members tool
 ```
 
 ## How It Works
 
 ### 1. Agent Architecture
 
-The agent uses LangChain's `create_agent` with a reasoning model:
+The agent is built using LangChain's `create_agent` function, which provides a streamlined way to implement a ReAct (Reasoning + Acting) loop:
 
 ```python
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
-# Configure the model with reasoning enabled
+# ... (tools and system_prompt defined)
+
 model = ChatOpenAI(
     model="gpt-5.1",
     reasoning={"effort": "medium", "summary": "detailed"},
 )
 
-# Create the agent
 agent = create_agent(
     model=model,
-    tools=[get_subscription_info, get_team_members, *mcp_tools],
+    tools=tools,
     system_prompt=system_prompt,
 )
 ```
 
-### 2. MCP Integration
+This setup allows the GPT-5.1 model to:
+- **Reason**: Analyze the user's query and determine the best course of action (e.g., which tool to call).
+- **Act**: Invoke the selected tool with appropriate arguments.
+- **Respond**: Generate a final answer based on tool outputs or direct knowledge.
 
-The Kapa MCP server is connected using `langchain-mcp-adapters`:
+### 2. Kapa MCP Integration
+
+The Kapa Hosted MCP Server is integrated as a tool using `langchain-mcp-adapters`. This allows the agent to access your product's documentation:
 
 ```python
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -223,13 +243,13 @@ mcp_client = MultiServerMCPClient({
     }
 })
 
-# Get tools from MCP server
+# Get tools from MCP server (e.g., search_yourproduct_knowledge_sources)
 mcp_tools = await mcp_client.get_tools()
 ```
 
 ### 3. Custom Tools
 
-Internal tools use LangChain's `@tool` decorator:
+Internal tools (like `get_subscription_info` and `get_team_members`) are defined using LangChain's `@tool` decorator. These represent interactions with your product's internal APIs or databases.
 
 ```python
 from langchain_core.tools import tool
@@ -238,60 +258,10 @@ from langchain_core.tools import tool
 def get_subscription_info(user_id: str = None) -> str:
     """Get information about the user's subscription plan."""
     # In production: call your billing API
-    return subscription_data
+    return "Mock subscription data"
 ```
-
-## Customizing for Your Product
-
-### Replace Mock Data
-
-The example uses mock data for subscription and team information. In production:
-
-1. **`src/tools/subscription.py`**: Connect to your billing system (Stripe, etc.)
-2. **`src/tools/team.py`**: Connect to your user management database
-
-### Add More Tools
-
-You can add any tools your in-product agent needs:
-
-```python
-@tool
-def create_project(name: str, template: str = "default") -> str:
-    """Create a new project for the user."""
-    # Your implementation
-    pass
-
-@tool  
-def get_recent_activity(days: int = 7) -> str:
-    """Get the user's recent activity in the product."""
-    # Your implementation
-    pass
-```
-
-### Customize the System Prompt
-
-Edit `SYSTEM_PROMPT_TEMPLATE` in `src/agent.py` to match your product's personality and capabilities.
-
-## Best Practices
-
-1. **Keep API keys server-side**: Never expose your Kapa API key in client-side code
-2. **Add authentication context**: In production, pass user context to tools for proper authorization
-3. **Rate limiting**: Kapa enforces 60 requests/minute per API key by default
-4. **Error handling**: The MCP tools handle errors gracefully, but consider adding retry logic for production
 
 ## Learn More
 
 - [Kapa Hosted MCP Server Documentation](https://docs.kapa.ai/integrations/mcp)
-- [LangChain Agents](https://docs.langchain.com/oss/python/langchain/agents)
-- [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
-- [Model Context Protocol Specification](https://modelcontextprotocol.io/)
-
-## Support
-
-For questions about:
-- **This example**: Open an issue on this repository
-- **Kapa MCP Server**: Contact support@kapa.ai
-- **LangChain/LangGraph**: Visit the [LangChain Discord](https://discord.gg/langchain)
-
-
-
+- [LangChain Agents Documentation](https://docs.langchain.com/oss/python/langchain/agents)
