@@ -1,4 +1,4 @@
-# In-Product Agent with Kapa Hosted MCP Server
+# In-Product Agent Example
 
 This is a **reference implementation** showing how to build an AI agent that lives inside your product. The kind of assistant users can chat with directly in your app—asking about their account, getting help with features, or taking actions.
 
@@ -91,28 +91,6 @@ docker compose run --rm agent
 python main.py
 ```
 
-### Configuration
-
-| Environment Variable | Required | Description |
-|---------------------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
-| `KAPA_MCP_SERVER_URL` | Yes | Your Kapa MCP server URL (e.g., `https://your-project.mcp.kapa.ai`) |
-| `KAPA_API_KEY` | Yes | API key for authenticating with your Kapa MCP server |
-| `PRODUCT_NAME` | No | Your product name (shown in agent responses). Defaults to `<Your Product>` |
-
-### Docker Commands
-
-```bash
-# Build the image
-docker compose build
-
-# Start a shell in the container
-docker compose run --rm agent
-
-# Once inside the container:
-python main.py
-```
-
 ## Alternative: Local Python Setup
 
 If you prefer running without Docker:
@@ -168,7 +146,6 @@ Loaded 1 tool(s) from Kapa MCP server:
 ------------------------------------------------------------
 
 You: What plan am I on?
-
 🧠 The user is asking about their subscription...
 
 🔧 Calling tool: get_subscription_info
@@ -315,4 +292,6 @@ For questions about:
 - **This example**: Open an issue on this repository
 - **Kapa MCP Server**: Contact support@kapa.ai
 - **LangChain/LangGraph**: Visit the [LangChain Discord](https://discord.gg/langchain)
+
+
 
