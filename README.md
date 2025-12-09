@@ -1,19 +1,20 @@
 # In-Product Agent with Kapa Hosted MCP Server
 
-This example demonstrates how to build an **in-product AI agent** using LangGraph and the **Kapa Hosted MCP Server**. The agent is designed to live inside a SaaS product's web app, helping users with both operational tasks and product knowledge questions.
+This is a **reference implementation** showing how to build an AI agent that lives inside your product. The kind of assistant users can chat with directly in your app—asking about their account, getting help with features, or taking actions.
+
+The specific tools in this example (subscription info, team members) are just **placeholders**. In your own implementation, you'd replace these with tools that call your actual APIs and do whatever makes sense for your product. The pattern stays the same.
 
 ## What This Example Shows
 
-This agent combines:
-
-1. **Internal Tools** - Custom tools that interact with your product's data (subscription info, team members)
-2. **Kapa MCP Server** - A hosted MCP server that provides semantic search over your product documentation
+1. **Your own tools** – Custom tools that call your product's APIs (we show mock examples for subscription and team data)
+2. **Kapa MCP tool** – Answers product questions by searching your documentation via the hosted MCP server
+3. **A reasoning model** – GPT-5.1 decides which tool to use based on what the user asks
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Your SaaS Product                           │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    LangGraph Agent                        │  │
+│  │                 AI Agent (GPT-5.1)                        │  │
 │  │                                                           │  │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐  │  │
 │  │  │ Subscription│  │    Team     │  │   Kapa MCP Tool  │  │  │
@@ -144,32 +145,46 @@ export PRODUCT_NAME="My Awesome Product"  # Optional
 python main.py
 ```
 
-This will:
-1. Initialize the agent with all tools
-2. Run a few example queries to demonstrate capabilities
-3. Start an interactive chat session
+This starts an interactive chat session where you can ask questions.
 
-### Example Interactions
+### Example Session
 
 ```
-🧑 User: What subscription plan am I on?
+============================================================
+  My Awesome Product Assistant
+============================================================
 
-🤖 Assistant: You're on the **Pro** plan with the following details:
-- **Status**: Active
-- **Seats**: 8/10 used (2 available)
-- **Billing**: Annual at $49.99/month
-...
+Initializing agent...
 
-🧑 User: Who are the admins on my team?
+Loaded 1 tool(s) from Kapa MCP server:
+  → search_my_awesome_product_knowledge_sources
 
-🤖 Assistant: Your team has 2 admins:
-- **Sarah Chen** (sarah.chen@acme.com) - Engineering
-- **Marcus Johnson** (marcus.j@acme.com) - Product
-...
+👋 Hi! I'm your My Awesome Product assistant. I can help you with:
 
-🧑 User: How do I set up a webhook integration?
+  📊 Subscription & Billing
+  👥 Team Management
+  📚 Product Questions
 
-🤖 Assistant: [Uses Kapa MCP to search your documentation and provide accurate instructions]
+------------------------------------------------------------
+
+You: What plan am I on?
+
+🧠 The user is asking about their subscription...
+
+🔧 Calling tool: get_subscription_info
+✓ Tool completed
+
+You're on the **Pro** plan with 8/10 seats used.
+
+You: How do I set up webhooks?
+
+🧠 This is a product question, I should search the documentation...
+
+🔧 Calling tool: search_my_awesome_product_knowledge_sources
+   query: how to set up webhooks
+✓ Tool completed
+
+To set up webhooks, go to Settings → Integrations → Webhooks...
 ```
 
 ## Project Structure
@@ -183,7 +198,7 @@ langchain-agent-example/
 ├── requirements.txt        # Python dependencies
 └── src/
     ├── __init__.py
-    ├── agent.py           # LangGraph agent definition
+    ├── agent.py           # Agent configuration (using create_agent)
     └── tools/
         ├── __init__.py
         ├── subscription.py # Subscription info tool
@@ -194,21 +209,24 @@ langchain-agent-example/
 
 ### 1. Agent Architecture
 
-The agent uses LangGraph's `StateGraph` with a simple but powerful pattern:
+The agent uses LangChain's `create_agent` with a reasoning model:
 
 ```python
-# Define state
-class AgentState(TypedDict):
-    messages: Annotated[list[AnyMessage], add_messages]
+from langchain.agents import create_agent
+from langchain_openai import ChatOpenAI
 
-# Build graph
-graph_builder = StateGraph(AgentState)
-graph_builder.add_node("agent", agent_node)
-graph_builder.add_node("tools", ToolNode(tools))
+# Configure the model with reasoning enabled
+model = ChatOpenAI(
+    model="gpt-5.1",
+    reasoning={"effort": "medium", "summary": "detailed"},
+)
 
-# Agent decides: respond or use tools
-graph_builder.add_conditional_edges("agent", tools_condition)
-graph_builder.add_edge("tools", "agent")  # Loop back after tool use
+# Create the agent
+agent = create_agent(
+    model=model,
+    tools=[get_subscription_info, get_team_members, *mcp_tools],
+    system_prompt=system_prompt,
+)
 ```
 
 ### 2. MCP Integration
@@ -275,7 +293,7 @@ def get_recent_activity(days: int = 7) -> str:
 
 ### Customize the System Prompt
 
-Edit `SYSTEM_PROMPT` in `src/agent.py` to match your product's personality and capabilities.
+Edit `SYSTEM_PROMPT_TEMPLATE` in `src/agent.py` to match your product's personality and capabilities.
 
 ## Best Practices
 
@@ -287,7 +305,7 @@ Edit `SYSTEM_PROMPT` in `src/agent.py` to match your product's personality and c
 ## Learn More
 
 - [Kapa Hosted MCP Server Documentation](https://docs.kapa.ai/integrations/mcp)
-- [LangGraph Documentation](https://langchain-ai.github.io/langgraph/)
+- [LangChain Agents](https://docs.langchain.com/oss/python/langchain/agents)
 - [LangChain MCP Adapters](https://github.com/langchain-ai/langchain-mcp-adapters)
 - [Model Context Protocol Specification](https://modelcontextprotocol.io/)
 
