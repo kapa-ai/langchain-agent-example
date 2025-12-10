@@ -10,8 +10,7 @@ What really matters is the approach:
 - **native tools** that talk to your product (e.g. billing, teams, settings),
 - a **Kapa retrieval tool via MCP** that searches your docs and guides.
 
-The agent runs in a loop: it reasons about what to do, calls tools, observes results, and repeats until it has enough information to respond. This means it can handle complex queries that require multiple steps — fetching data from one source, reasoning about it, then fetching more data before answering.
-
+Together, this gives you an in-product agent that can use both your live product data and your documentation to help users without leaving your app.
 
 This example uses LangChain’s `create_agent` for orchestration and an OpenAI reasoning model, but you can swap this for any agent framework including none and any reasoning model that supports tools.
 
