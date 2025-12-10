@@ -14,35 +14,6 @@ Together, this gives you an in-product agent that can use both your live product
 
 This example uses LangChain’s `create_agent` for orchestration and an OpenAI reasoning model, but you can swap this for any agent framework including none and any reasoning model that supports tools.
 
-## Architecture Overview
-
-Here’s how the pieces fit together inside your product:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Your SaaS Product                           │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      AI Agent                             │  │
-│  │                   (GPT-5.1 + Tools)                       │  │
-│  │                                                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │  │
-│  │  │ Subscription│  │    Team     │  │   Kapa MCP Tool  │   │  │
-│  │  │    Tool     │  │   Tool      │  │ (Documentation)  │   │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └────────┬─────────┘   │  │
-│  └─────────┼────────────────┼──────────────────┼─────────────┘  │
-│            │                │                  │                │
-│            ▼                ▼                  │                │
-│      Your APIs        Your Database            │                │
-└────────────────────────────────────────────────┼────────────────┘
-                                                 │
-                                                 ▼
-                                   ┌─────────────────────────┐
-                                   │  Kapa Hosted MCP Server │
-                                   │   (your-project.mcp.    │
-                                   │       kapa.ai)          │
-                                   └─────────────────────────┘
-```
-
 ## Prerequisites
 
 - Docker and Docker Compose
