@@ -10,7 +10,7 @@ What really matters is the approach:
 - **native tools** that talk to your product (e.g. billing, teams, settings),
 - a **Kapa retrieval tool via MCP** that searches your docs and guides.
 
-Together, this gives you an in-product agent that can use both your live product data and your documentation to help users without leaving your app.
+The agent runs in a loop: it reasons about what to do, calls tools, observes results, and repeats until it has enough information to respond. This means it can handle complex queries that require multiple steps — fetching data from one source, reasoning about it, then fetching more data before answering.
 
 
 This example uses LangChain’s `create_agent` for orchestration and an OpenAI reasoning model, but you can swap this for any agent framework including none and any reasoning model that supports tools.
@@ -238,10 +238,15 @@ agent = create_agent(
 )
 ```
 
-This setup allows the GPT-5.1 model to:
-- **Reason**: Analyze the user's query and determine the best course of action (e.g., which tool to call).
-- **Act**: Invoke the selected tool with appropriate arguments.
-- **Respond**: Generate a final answer based on tool outputs or direct knowledge.
+The agent follows a **ReAct (Reasoning + Acting) loop**:
+
+1. **Reason** — Analyze the situation and decide what to do next
+2. **Act** — Call one or more tools
+3. **Observe** — See the results
+4. **Repeat** — Go back to step 1 if more information is needed
+5. **Respond** — Generate a final answer once satisfied
+
+This loop is flexible: the agent might call one tool and respond immediately, or it might chain several tool calls with reasoning steps in between. It decides dynamically based on what it learns from each tool result.
 
 ### 2. Kapa MCP Integration
 
