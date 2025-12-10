@@ -177,6 +177,23 @@ You: How do I set up webhooks?
 ✓ Tool completed
 
 To set up webhooks, go to Settings → Integrations → Webhooks...
+
+You: What's my plan and who are the admins on my team?
+
+🧠 The user is asking two things - subscription info and team members filtered by role...
+
+🔧 Calling tool: get_subscription_info
+✓ Tool completed
+
+🧠 Now I need to get the admin team members...
+
+🔧 Calling tool: get_team_members
+   role: admin
+✓ Tool completed
+
+You're on the **Pro** plan with 8/10 seats used. Your team has 2 admins:
+- Alice Smith (alice.s@acme.com) - Engineering
+- Diana Ross (diana.r@acme.com) - Product
 ```
 
 ## Project Structure
