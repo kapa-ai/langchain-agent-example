@@ -2,7 +2,7 @@
 
 This repo contains an example in-product agent whose purpose is to show you how to build your own assistant inside your app.
 
-The agent in this example can answer questions about subscription plans, team members, and your product docs — but these are all **dummy tools**. They only exist to demonstrate the pattern; in a real setup you’d replace them with tools that call your own APIs and data stores.
+The agent in this example answers questions about subscription plans and team members through **mock tools**, and questions about your product through the Kapa tools. The mock tools only demonstrate the pattern. In a real setup you replace them with tools that call your own APIs and data stores.
 
 What really matters is the approach:
 
@@ -157,12 +157,12 @@ You: What's my plan and who are the admins on my team?
 🧠 Now I need to get the admin team members...
 
 🔧 Calling tool: get_team_members
-   role: admin
+   role_filter: admin
 ✓ Tool completed
 
 You're on the **Pro** plan with 8/10 seats used. Your team has 2 admins:
-- Alice Smith (alice.s@acme.com) - Engineering
-- Diana Ross (diana.r@acme.com) - Product
+- Sarah Chen (sarah.chen@acme.com) - Engineering
+- Marcus Johnson (marcus.j@acme.com) - Product
 ```
 
 ## Project Structure
@@ -209,11 +209,11 @@ agent = create_agent(
 
 The agent follows a **ReAct (Reasoning + Acting) loop**:
 
-1. **Reason** — Analyze the situation and decide what to do next
-2. **Act** — Call one or more tools
-3. **Observe** — See the results
-4. **Repeat** — Go back to step 1 if more information is needed
-5. **Respond** — Generate a final answer once satisfied
+1. **Reason**: Analyze the situation and decide what to do next
+2. **Act**: Call one or more tools
+3. **Observe**: See the results
+4. **Repeat**: Go back to step 1 if more information is needed
+5. **Respond**: Generate a final answer once satisfied
 
 This loop is flexible: the agent might call one tool and respond immediately, or it might chain several tool calls with reasoning steps in between. It decides dynamically based on what it learns from each tool result.
 
