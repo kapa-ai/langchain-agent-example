@@ -1,2 +1,2 @@
-# LangChain Agent with Kapa MCP Server Example
+# LangChain Agent with the Kapa LangChain package
 

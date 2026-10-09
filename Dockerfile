@@ -1,4 +1,4 @@
-# LangChain Agent with Kapa MCP Server Example
+# LangChain Agent with the Kapa LangChain package
 FROM python:3.12-slim
 
 WORKDIR /app
