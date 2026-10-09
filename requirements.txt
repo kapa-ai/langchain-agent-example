@@ -1,9 +1,9 @@
-# LangChain Agent with Kapa MCP Server Example
+# LangChain Agent with the Kapa LangChain package
 # Core dependencies
-langchain>=0.3.0
+langchain>=1.0.0
 langgraph>=0.2.0
 langchain-openai>=0.2.0
-langchain-mcp-adapters>=0.1.0
+langchain-kapa-ai>=0.1.0
 
 # For async support
 httpx>=0.27.0

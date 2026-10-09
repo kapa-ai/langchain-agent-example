@@ -2,13 +2,13 @@
 
 This repo contains an example in-product agent whose purpose is to show you how to build your own assistant inside your app.
 
-The agent in this example can answer questions about subscription plans, team members, and your product docs — but these are all **dummy tools**. They only exist to demonstrate the pattern; in a real setup you’d replace them with tools that call your own APIs and data stores.
+The agent in this example answers questions about subscription plans and team members through **mock tools**, and questions about your product through the Kapa tools. The mock tools only demonstrate the pattern. In a real setup you replace them with tools that call your own APIs and data stores.
 
 What really matters is the approach:
 
 - a **reasoning model** (GPT-5.1) that decides what to do,
 - **native tools** that talk to your product (e.g. billing, teams, settings),
-- a **Kapa retrieval tool via MCP** that searches your docs and guides.
+- the **Kapa LangChain package**, which gives the agent search over your docs and guides and lookup of whole documents.
 
 Together, this gives you an in-product agent that can use both your live product data and your documentation to help users without leaving your app.
 
@@ -18,19 +18,15 @@ This example uses LangChain’s `create_agent` for orchestration and an OpenAI r
 
 - Docker and Docker Compose
 - An OpenAI API key
-- An active Kapa account with a project that has a Hosted MCP Server configured (if you don't have one yet, follow the instructions below)
+- An active Kapa account with a project that has knowledge sources indexed (if you don't have one yet, follow [Index your first source](https://docs.kapa.ai/getting-started/index-your-first-source))
 
-## Setting Up Your Kapa MCP Server
+## Connecting Your Kapa Project
 
-1. In the [Kapa platform](https://app.kapa.ai), click **Integrations** > **+ Add new integration**
-2. Choose **Hosted MCP Server**
-3. Configure:
-   - **Subdomain**: This becomes `<subdomain>.mcp.kapa.ai`
-   - **Server name**: The MCP server label
-   - **Authentication type**: Select **API key** for in-product agents
-4. Copy your API key from the integration settings
+1. In the [Kapa platform](https://app.kapa.ai), select your project
+2. Open **API Keys** under **Deploy** and click **Add API key**, then copy the private key
+3. Open **Settings** > **Projects** and click **Copy project ID** next to your project
 
-> **Important**: API key authentication is required for in-product agents. Never expose your API key in client-side code.
+> **Important**: The agent runs on your backend. Never expose your API key in client-side code.
 
 ## Quick Start with Docker
 
@@ -51,8 +47,8 @@ Edit `.env` with your values:
 
 ```bash
 OPENAI_API_KEY=sk-your-openai-api-key
-KAPA_MCP_SERVER_URL=https://your-project.mcp.kapa.ai
 KAPA_API_KEY=your-kapa-api-key
+KAPA_PROJECT_ID=your-project-id
 PRODUCT_NAME=My Awesome Product
 ```
 
@@ -89,8 +85,8 @@ pip install -r requirements.txt
 
 ```bash
 export OPENAI_API_KEY=sk-your-openai-api-key
-export KAPA_MCP_SERVER_URL=https://your-project.mcp.kapa.ai
 export KAPA_API_KEY=your-kapa-api-key
+export KAPA_PROJECT_ID=your-project-id
 export PRODUCT_NAME="My Awesome Product"  # Optional
 ```
 
@@ -111,8 +107,9 @@ This starts an interactive chat session where you can ask questions.
 
 Initializing agent...
 
-Loaded 1 tool(s) from Kapa MCP server:
-  → search_my_awesome_product_knowledge_sources
+Loaded 2 tool(s) from the Kapa LangChain package:
+  → search_knowledge_sources
+  → get_knowledge_documents
 
 👋 Hi! I'm your My Awesome Product assistant. I can help you with:
 
@@ -142,11 +139,13 @@ You: How do I set up webhooks?
 
 🧠 This is a product question, I should search the documentation...
 
-🔧 Calling tool: search_my_awesome_product_knowledge_sources
+🔧 Calling tool: search_knowledge_sources
    query: how to set up webhooks
 ✓ Tool completed
 
 To set up webhooks, go to Settings → Integrations → Webhooks...
+
+Source: https://docs.example.com/webhooks#setup
 
 You: What's my plan and who are the admins on my team?
 
@@ -158,12 +157,12 @@ You: What's my plan and who are the admins on my team?
 🧠 Now I need to get the admin team members...
 
 🔧 Calling tool: get_team_members
-   role: admin
+   role_filter: admin
 ✓ Tool completed
 
 You're on the **Pro** plan with 8/10 seats used. Your team has 2 admins:
-- Alice Smith (alice.s@acme.com) - Engineering
-- Diana Ross (diana.r@acme.com) - Product
+- Sarah Chen (sarah.chen@acme.com) - Engineering
+- Marcus Johnson (marcus.j@acme.com) - Product
 ```
 
 ## Project Structure
@@ -210,34 +209,26 @@ agent = create_agent(
 
 The agent follows a **ReAct (Reasoning + Acting) loop**:
 
-1. **Reason** — Analyze the situation and decide what to do next
-2. **Act** — Call one or more tools
-3. **Observe** — See the results
-4. **Repeat** — Go back to step 1 if more information is needed
-5. **Respond** — Generate a final answer once satisfied
+1. **Reason**: Analyze the situation and decide what to do next
+2. **Act**: Call one or more tools
+3. **Observe**: See the results
+4. **Repeat**: Go back to step 1 if more information is needed
+5. **Respond**: Generate a final answer once satisfied
 
 This loop is flexible: the agent might call one tool and respond immediately, or it might chain several tool calls with reasoning steps in between. It decides dynamically based on what it learns from each tool result.
 
-### 2. Kapa MCP Integration
+### 2. Kapa Tools
 
-The Kapa Hosted MCP Server is integrated as a tool using `langchain-mcp-adapters`. This allows the agent to access your product's documentation:
+The Kapa LangChain package provides the agent's knowledge tools through `KapaToolkit`. `search_knowledge_sources` returns the most relevant chunks of your documentation with their source links, and `get_knowledge_documents` fetches a whole page when a chunk is not enough:
 
 ```python
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_kapa_ai import KapaToolkit
 
-mcp_client = MultiServerMCPClient({
-    "kapa": {
-        "transport": "streamable_http",
-        "url": "https://your-project.mcp.kapa.ai",
-        "headers": {
-            "Authorization": f"Bearer {api_key}"
-        }
-    }
-})
-
-# Get tools from MCP server (e.g., search_yourproduct_knowledge_sources)
-mcp_tools = await mcp_client.get_tools()
+# Reads KAPA_API_KEY and KAPA_PROJECT_ID from the environment when not passed
+kapa_tools = KapaToolkit().get_tools()
 ```
+
+The toolkit also accepts retrieval and document settings, for example `source_group_ids` to restrict both tools to some of your sources. The [package reference](https://docs.kapa.ai/retrieval/frameworks/langchain) lists them.
 
 ### 3. Custom Tools
 
@@ -255,5 +246,6 @@ def get_subscription_info(user_id: str = None) -> str:
 
 ## Learn More
 
-- [Kapa Hosted MCP Server Documentation](https://docs.kapa.ai/integrations/mcp)
+- [Kapa LangChain package reference](https://docs.kapa.ai/retrieval/frameworks/langchain)
+- [Add knowledge base search to a LangChain agent](https://docs.kapa.ai/examples/langchain-knowledge-base-search)
 - [LangChain Agents Documentation](https://docs.langchain.com/oss/python/langchain/agents)

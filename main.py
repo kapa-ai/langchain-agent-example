@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-In-Product Agent with Kapa MCP Server
+In-Product Agent with the Kapa LangChain package
 
 A demo chat interface for the LangGraph agent that combines:
 1. Custom tools for subscription and team management
-2. Kapa MCP server for product documentation knowledge
+2. Kapa search and document tools for product documentation knowledge
 
 Usage:
     python main.py
@@ -34,14 +34,14 @@ async def main():
     print()
     
     try:
-        agent = await create_in_product_agent()
+        agent = create_in_product_agent()
     except ValueError as e:
         print(f"Error: {e}")
         print()
         print("Please make sure you have set the following environment variables:")
         print("  - OPENAI_API_KEY")
-        print("  - KAPA_MCP_SERVER_URL")
         print("  - KAPA_API_KEY")
+        print("  - KAPA_PROJECT_ID")
         return
     
     # Print introduction

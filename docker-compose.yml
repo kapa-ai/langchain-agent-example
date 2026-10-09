@@ -7,8 +7,8 @@ services:
       - .:/app  # Mount entire repo for live editing
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - KAPA_MCP_SERVER_URL=${KAPA_MCP_SERVER_URL}
       - KAPA_API_KEY=${KAPA_API_KEY}
+      - KAPA_PROJECT_ID=${KAPA_PROJECT_ID}
       - PRODUCT_NAME=${PRODUCT_NAME:-<Your Product>}
     env_file:
       - path: .env
